@@ -8,7 +8,7 @@ from langchain_classic.chains.history_aware_retriever import create_history_awar
 from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -16,12 +16,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+#os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
+#embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 st.title("CONVERSATIONAL Q&A CHATBOT WITH PDF UPLOADS AND CHAT HISTORY")
 st.write("UPLOADS PDFs AND CHAT WITH THE CONTENT")
 
+huggingfacehub_api_token = st.text_input("ENTER YOUR HUGGING FACE TOkEN", type="password")
+if huggingfacehub_api_token:
+    embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=huggingfacehub_api_token,
+    model_name="sentence-transformers/all-MiniLM-l6-v2",
+)
 api_key = st.text_input("ENTER YOUR GROQ API KEY", type="password")
 if api_key:
     llm = ChatGroq(api_key=api_key, model="llama-3.3-70b-versatile")
@@ -90,3 +96,29 @@ if api_key:
         question_asnwer_chain = create_stuff_documents_chain(llm,qa_prompt)
         rag_chain = create_retrieval_chain(history_aware_retriever, question_asnwer_chain)
 
+        def get_session_history(session: str)-> BaseChatMessageHistory:
+            if session_id not in st.session_state.store:
+                st.session_state.store[session_id] = ChatMessageHistory()
+            return st.session_state.store[session_id]
+        
+        converstational_rag_chain = RunnableWithMessageHistory(
+            rag_chain, get_session_history=get_session_history,
+            input_messages_key='input',
+            history_messages_key='chat_history',
+            output_messages_key='asnwer'
+        )
+
+        user_input = st.text_input("YOUR QUESTION:")
+
+        if user_input:
+            session_history = get_session_history(session_id)
+            response = converstational_rag_chain.invoke(
+                {'input':user_input},
+                config={
+                    "configurable":{'session_id':session_id}
+                }, #Construct a key "abc" in store
+            )
+
+            st.write(st.session_state.store)
+            st.write('ASSISTANT',response['answer'])
+            st.write("CHAT_HISTORY",session_history.messages)
