@@ -67,5 +67,5 @@ if api_key:
             ]
         )
 
-        history_aware_retriever = 
+#        history_aware_retriever = 
 
