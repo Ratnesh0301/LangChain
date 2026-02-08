@@ -31,3 +31,7 @@ pytube
 numexpr
 huggingface_hub
 streamlit
+cassio
+datasets
+openai
+tiktoken
